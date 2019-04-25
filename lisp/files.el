@@ -842,6 +842,32 @@ output directories whose names match REGEXP."
 	    (push (expand-file-name file dir) files)))))
     (nconc result (nreverse files))))
 
+(defun path-files (path &optional pred)
+  "Return a list of all files matching PRED in PATH.
+PATH is flat; no subdirectories of entries in PATH are
+visited (unless they are also in PATH).  PRED is a function
+taking one argument; an absolute file name."
+  (let (visited ;; list of already visited directories, to avoid duplication
+        result)
+    (dolist (dir path)
+      (while (member dir visited)
+	(setq dir (pop path)))
+      (when (and dir
+                 (file-directory-p dir))
+	(push dir visited)
+        (mapc
+         (lambda (rel-file)
+           (let ((absfile (concat (file-name-as-directory dir) rel-file)))
+	     (when (and (not (string-equal "." (substring absfile -1)))
+		        (not (string-equal ".." (substring absfile -2)))
+		        (not (file-directory-p absfile))
+                        (or (null pred)
+                            (funcall pred absfile)))
+	       (push absfile result))))
+	 (file-name-all-completions "" dir));; uses completion-regexp-list
+        ))
+    result))
+
 (defvar module-file-suffix)
 
 (defun load-file (file)

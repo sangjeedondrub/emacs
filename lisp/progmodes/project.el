@@ -88,6 +88,7 @@
 ;;; Code:
 
 (require 'cl-generic)
+(require 'file-complete-root-relative)
 
 (defvar project-find-functions (list #'project-try-vc)
   "Special hook to find the project containing a given directory.
@@ -162,14 +163,12 @@ end it with `/'.  DIR must be one of `project-roots' or
 DIRS is a list of absolute directories; it should be some
 subset of the project roots and external roots.
 
-The default implementation delegates to `project-files'."
-  (let ((all-files (project-files project dirs)))
-    (lambda (string pred action)
-      (cond
-       ((eq action 'metadata)
-        '(metadata . ((category . project-file))))
-       (t
-        (complete-with-action action all-files string pred))))))
+The default implementation gets a file list from `project-files',
+and uses the `file-root-rel' completion style."
+  (when (= 1 (length dirs))
+    (let* ((all-files (project-files project dirs))
+           (alist (fc-root-rel-to-alist (car dirs) all-files)))
+      (apply-partially #'fc-root-rel-completion-table alist))))
 
 (cl-defmethod project-roots ((project (head transient)))
   (list (cdr project)))
@@ -449,14 +448,14 @@ pattern to search for."
     (read-regexp "Find regexp" (and id (regexp-quote id)))))
 
 ;;;###autoload
-(defun project-find-file ()
+(defun project-find-file (&optional filename)
   "Visit a file (with completion) in the current project's roots.
-The completion default is the filename at point, if one is
-recognized."
+The completion default is FILENAME, or if nil, the filename at
+point, if one is recognized."
   (interactive)
   (let* ((pr (project-current t))
          (dirs (project-roots pr)))
-    (project-find-file-in (thing-at-point 'filename) dirs pr)))
+    (project-find-file-in (or filename (thing-at-point 'filename)) dirs pr)))
 
 ;;;###autoload
 (defun project-or-external-find-file ()
@@ -483,42 +482,25 @@ recognized."
 (defun project--completing-read-strict (prompt
                                         collection &optional predicate
                                         hist default inherit-input-method)
-  ;; Tried both expanding the default before showing the prompt, and
-  ;; removing it when it has no matches.  Neither seems natural
-  ;; enough.  Removal is confusing; early expansion makes the prompt
-  ;; too long.
-  (let* ((common-parent-directory
-          (let ((common-prefix (try-completion "" collection)))
-            (if (> (length common-prefix) 0)
-                (file-name-directory common-prefix))))
-         (cpd-length (length common-parent-directory))
-         (prompt (if (zerop cpd-length)
-                     prompt
-                   (concat prompt (format " in %s" common-parent-directory))))
-         ;; XXX: This requires collection to be "flat" as well.
-         (substrings (mapcar (lambda (s) (substring s cpd-length))
-                             (all-completions "" collection)))
-         (new-collection
-          (lambda (string pred action)
-            (cond
-             ((eq action 'metadata)
-              (if (functionp collection) (funcall collection nil nil 'metadata)))
-             (t
-	      (complete-with-action action substrings string pred)))))
-         (new-prompt (if default
-                         (format "%s (default %s): " prompt default)
-                       (format "%s: " prompt)))
-         (res (completing-read new-prompt
-                               new-collection predicate t
-                               nil ;; initial-input
-                               hist default inherit-input-method)))
+  (let* ((prompt (if (and default (< 0 (length default)))
+                     (format "%s (default %s): " prompt default)
+                   (format "%s: " prompt)))
+         (res (completing-read prompt
+                       collection predicate
+                       t   ;; require-match
+                       nil ;; initial-input
+                       hist default inherit-input-method)))
     (when (and (equal res default)
                (not (test-completion res collection predicate)))
+      ;; Tried both expanding the default before showing the prompt, and
+      ;; removing it when it has no matches.  Neither seems natural
+      ;; enough.  Removal is confusing; early expansion makes the prompt
+      ;; too long.
       (setq res
-            (completing-read (format "%s: " prompt)
-                             new-collection predicate t res hist nil
+            (completing-read prompt
+                             collection predicate t res hist nil
                              inherit-input-method)))
-    (concat common-parent-directory res)))
+    res))
 
 (declare-function fileloop-continue "fileloop" ())
 

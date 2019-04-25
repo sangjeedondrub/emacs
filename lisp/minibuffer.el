@@ -846,6 +846,7 @@ styles for specific categories, such as files, buffers, etc."
 (defvar completion-category-defaults
   '((buffer (styles . (basic substring)))
     (unicode-name (styles . (basic substring)))
+    (uniquify-file (styles . (uniquify-file)))
     (project-file (styles . (substring)))
     (info-menu (styles . (basic substring))))
   "Default settings for specific completion categories.
@@ -3582,6 +3583,13 @@ See `completing-read' for the meaning of the arguments."
                                        nil hist def inherit-input-method)))
     (when (and (equal result "") def)
       (setq result (if (consp def) (car def) def)))
+
+    (when (completion-metadata-get (completion-metadata "" collection nil) 'alist)
+      (setq result (funcall collection result nil 'alist)))
+
+    ;; If collection is itself an alist, we could also fetch that
+    ;; result here, but that would not be backward compatible.
+
     result))
 
 ;; Miscellaneous
