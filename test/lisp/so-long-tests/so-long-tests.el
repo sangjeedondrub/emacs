@@ -151,6 +151,50 @@
         (so-long-revert)
         (so-long-tests-assert-reverted action)))))
 
+(ert-deftest so-long-tests-command-so-long ()
+  "Test using the `so-long' command."
+  (with-temp-buffer
+    (insert "#!emacs\n")
+    (normal-mode)
+    (so-long-tests-remember)
+    (insert (make-string (1+ so-long-threshold) ?x))
+    (so-long)
+    (so-long-tests-assert-active 'so-long-mode)
+    (so-long-revert)
+    (so-long-tests-assert-reverted 'so-long-mode))
+  (dolist (action (mapcar #'car so-long-action-alist))
+    (with-temp-buffer
+      (insert "#!emacs\n")
+      (normal-mode)
+      (so-long-tests-remember)
+      (insert (make-string (1+ so-long-threshold) ?x))
+      (so-long action)
+      (so-long-tests-assert-active action t)
+      (so-long-revert)
+      (so-long-tests-assert-reverted action t))))
+
+(ert-deftest so-long-tests-major-mode ()
+  "Test calling `so-long-mode' directly."
+  (with-temp-buffer
+    (insert "#!emacs\n")
+    (normal-mode)
+    (so-long-tests-remember)
+    (so-long-mode)
+    (so-long-tests-assert-active 'so-long-mode)
+    (so-long-revert)
+    (so-long-tests-assert-reverted 'so-long-mode)))
+
+(ert-deftest so-long-tests-minor-mode ()
+  "Test calling `so-long-minor-mode' directly."
+  (with-temp-buffer
+    (insert "#!emacs\n")
+    (normal-mode)
+    (so-long-tests-remember)
+    (so-long-minor-mode 1)
+    (so-long-tests-assert-active 'so-long-minor-mode t)
+    (so-long-minor-mode 0)
+    (so-long-tests-assert-reverted 'so-long-minor-mode t)))
+
 (ert-deftest so-long-tests-target-modes ()
   "Targeted major modes."
   (with-temp-buffer
