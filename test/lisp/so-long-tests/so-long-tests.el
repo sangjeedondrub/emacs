@@ -258,6 +258,8 @@
     (so-long-revert)
     (so-long-tests-assert-reverted 'so-long-minor-mode)))
 
+(defvar so-long-tests-local-mode 'unset)
+
 (defmacro so-long-tests-deftest-file-local-emacs-lisp-mode
     (sym docstring file-local-spec)
   "Generate tests for using `emacs-lisp-mode' as a file-local mode."
@@ -292,6 +294,17 @@
          (so-long-tests-assert-active 'so-long-mode)
          (so-long-revert)
          (so-long-tests-assert-reverted 'so-long-mode))
+       ;; Custom function
+       (setq-default so-long-file-local-mode-function
+                     (lambda (mode)
+                       (setq so-long-tests-local-mode mode)))
+       (with-temp-buffer
+         (insert ,file-local-spec)
+         (insert (make-string (1+ so-long-threshold) ?x))
+         (let (so-long-tests-local-mode)
+           (normal-mode)
+           (should (eq so-long-tests-local-mode 'emacs-lisp-mode))
+           (so-long-tests-assert-active 'so-long-mode)))
        ;; end
        (setq-default so-long-file-local-mode-function orig))))
 
@@ -339,6 +352,19 @@
          (so-long-tests-assert-active 'so-long-mode)
          (so-long-revert)
          (so-long-tests-assert-reverted 'so-long-mode))
+       ;; Custom function.  When the file-local mode is `so-long-mode'
+       ;; we do not call `so-long-file-local-mode-function' at all.
+       (setq-default so-long-file-local-mode-function
+                     (lambda (mode)
+                       (setq so-long-tests-local-mode mode)))
+       (with-temp-buffer
+         (insert ,file-local-spec)
+         (insert (make-string (1+ so-long-threshold) ?x))
+         (let (so-long-tests-local-mode)
+           (normal-mode)
+           (should (eq so-long-tests-local-mode nil))
+           (should (eq so-long--inhibited t))
+           (so-long-tests-assert-active 'so-long-mode)))
        ;; end
        (setq-default so-long-file-local-mode-function orig))))
 
